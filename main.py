@@ -70,8 +70,8 @@ def find_zeros(f, mu_star, mu):
         root = optimize.brentq(f, intervals[i], intervals[i+1])
         zeros.append(root)
         types.append('L' if diff > 0 else 'R')
-    if len(zeros) == 0:
-        print('No Zeros???')
+    if len(zeros) == 0: # This should be impossible.
+        print('No Zeros??? Something went terribly wrong... Printing helpful debug info')
         print('intervals', intervals)
         print('f(intervals)', f(intervals))
         print('mus', mu_star, mu)
@@ -96,7 +96,7 @@ def opt_d_grad(alpha_star, alpha, mu_star, mu):
     if len(zeros) == 0:
         plot_F(alpha_star, alpha, mu_star, mu)
         raise Exception('No zeros detected this should be analytically impossible')
-    default = -10
+    default = -10  # default does not affect training, only plotting.
     if len(zeros) == 1:
         if types[0] == 'R':             # + -
             l = [-np.inf, default]
@@ -114,10 +114,10 @@ def opt_d_grad(alpha_star, alpha, mu_star, mu):
             r = [zeros[1], default]
 
     if len(zeros) == 3:
-        if types[0] == 'R':
+        if types[0] == 'R':             # + - + -
             l = [-np.inf, zeros[1]]
             r = [zeros[0], zeros[2]]
-        else:
+        else:                           # - + - +
             l = [zeros[0], zeros[2]]
             r = [zeros[1], np.inf]
     return l, r
@@ -140,9 +140,9 @@ def train(alpha_star, mu_star,
           optimal_discriminator,
           train_alpha,
          ):
-
     assert mu_star[0] < mu_star[1]
     assert mu_zero[0] < mu_zero[1]
+
     # Initialize Time dependent variables
     alpha_hats = init_list(alpha_zero, T)
     mu_hats = init_list(mu_zero, T)
@@ -168,6 +168,8 @@ def train(alpha_star, mu_star,
 def plot_training(alpha_star, mu_star, alpha_hats, 
                   mu_hats, l_hats, r_hats, T,
                   plot_intervals = True):
+    """ Plot time series describing training behavior.
+    """
     fix, ax = plt.subplots(1,1)
     print(np.array(mu_hats).shape)
     mu_hats = np.array(mu_hats)
@@ -188,17 +190,21 @@ def plot_training(alpha_star, mu_star, alpha_hats,
     ax.set_ylim((-3,3))
     plt.show()
 
+
 def plot_F(alpha_star, alpha, mu_star, mu):
+    """ Plot the TV distance as defined as G* - G_hat"""
     fix, ax = plt.subplots(1,1)
     x = np.linspace(-2, 2, 1000)
     f = F(alpha_star, alpha, mu_star, mu)
-    zeros = find_zeros(f, mu_star, mu)
-    print(zeros)
+    #zeros = find_zeros(f, mu_star, mu)
+    #print(zeros)
     #ax.plot(x, F(alpha_star, [0,0], mu_star, mu)(x), label = 'G_star')
     #ax.plot(x, F([0,0], alpha, mu_star, mu)(x), label = 'G_hat')
     ax.plot(x, F(alpha_star, alpha, mu_star, mu)(x), label = 'F')
     ax.legend(loc='best')
     plt.show()
+
+
 if __name__ == '__main__':
     alpha_star = [0.5, 0.5]
     alpha_zero = [0.5, 0.5]
