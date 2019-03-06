@@ -10,7 +10,6 @@ import matplotlib.pyplot as plt
 
 def init_list(init_value, T):
     arr = [None] * T
-    print(arr)
     arr[0] = init_value
     return arr
 
@@ -36,7 +35,13 @@ def loss(alpha_star, alpha, mu_star, mu, l, r):
 
 
 def F(alpha_star, alpha, mu_star, mu):
-    """ function to return f(x) representing loss function values """
+    """ function to return f(x) representing loss function values.
+
+    Represents the difference between two univariate gaussian mixtures
+    parameterized by alpha the mixture parameter and mu the means.
+    alpha_star, alpha are scalar parameters where mu_star, mu are
+    vectors of length 2.
+    """
     def f(x):
         return (alpha_star[0] * norm.pdf(x, mu_star[0]) + 
                 alpha_star[1] * norm.pdf(x, mu_star[1]) - 
@@ -124,8 +129,39 @@ def opt_d_grad(alpha_star, alpha, mu_star, mu):
     return l, r
 
 
-def mu_grad(alpha, mu, l, r):
-    """ Computes the derivatives of mu like C.1 but improved.
+def loss_gradient_mu(alpha, left, right, mu):
+    """ gradient of the loss function with respect to mu"""
+    grads = np.zeros(2)
+    for j,m in enumerate(mu):
+        grad = 0
+        for l,r in zip(left, right):
+            # print('pdf', l, r, norm.pdf(m, r), norm.pdf(m,l))
+            grad += norm.pdf(m, r) - norm.pdf(m, l)
+        grads[j] = grad
+    grads *= alpha
+    # print('Mu Gradient', grads)
+    return grads
+
+
+def loss_gradient_left(left):
+    """ gradient of the loss function with respect to the left side boundaries"""
+    def grad(alpha_star, alpha, mu_star, mu):
+        return -F(alpha_star, alpha, mu_star, mu)(left)
+
+
+def loss_gradient_right(right):
+    """ gradient of the loss function with respect to the right side
+    boundaries. Renaming of F
+    """
+    def grad(alpha_star, alpha, mu_star, mu):
+        return F(alpha_star, alpha, mu_star, mu)(right)
+
+
+def opt_mu_grad(alpha, mu, l, r):
+    """ Computes the derivatives of mu like C.1 but improved. Only works in 
+    the optimal discriminator case. This is a simplification of
+    loss_gradient_mu function, which applies for general l, r discriminator
+    bounds.
     """
     mu_grads = []
     for m in mu:
@@ -134,7 +170,7 @@ def mu_grad(alpha, mu, l, r):
         for ll, rr in zip(l,r):
             v += norm.pdf(m, rr) - norm.pdf(m, ll)
         mu_grads.append(s*v)
-    print('Mu Grad', np.array(mu_grads))
+    # print('Mu Grad', np.array(mu_grads))
     return np.array(mu_grads)
 
 def train(alpha_star, mu_star, 
@@ -158,15 +194,23 @@ def train(alpha_star, mu_star,
 
         if optimal_discriminator:
             l_hats[t+1], r_hats[t+1] = opt_d_grad(alpha_star, alpha_hats[t+1], mu_star, mu_hats[t])
-            print('(l,r)', l_hats[t+1], r_hats[t+1])
+            mu_hats[t+1] = mu_hats[t] - step_size * mu_grad(alpha_hats[t+1], mu_hats[t], l_hats[t+1], r_hats[t+1])
         else:  # First order dynamics
-            print('ERROR: non optimal discriminator not yet implemented')
-            
+            l_hats[t+1] = l_hats[t] - (step_size * -F(alpha_star, alpha_hats[t], mu_star, mu_hats[t])(l_hats[t]))
+            r_hats[t+1] = r_hats[t] - (step_size * F(alpha_star, alpha_hats[t], mu_star, mu_hats[t])(r_hats[t]))
 
-        mu_hats[t+1] = mu_hats[t] - step_size * mu_grad(alpha_hats[t+1], mu_hats[t], l_hats[t+1], r_hats[t+1])
-        print('Mu Hat', mu_hats[t+1])
+            # The following relies on the non trivial derivation by
+            # wolfram alpha
+            # "derivative with respect to u of integral of e^(-(x - c)^2) - 
+            # e^(-(x-u)^2) with respect to x from a to b"
+            # Thus is the differences of normal pdfs centered at r and those at l
+            # This is a little hacky using the same function but should work
+            mu_hats[t+1] = mu_hats[t] - step_size * loss_gradient_mu(alpha_hats[t], r_hats[t], l_hats[t], mu_hats[t])
 
-
+        # print('(l,r)', l_hats[t+1], r_hats[t+1])
+        # print('Mu Hat', mu_hats[t+1])
+        # print('l_hats', np.array(l_hats))
+        # print('r_hats', np.array(r_hats))
 
         # Assert mu_0 < mu_1
         mu_hats[t+1] = sorted(mu_hats[t+1])
@@ -219,21 +263,25 @@ def plot_F(alpha_star, alpha, mu_star, mu):
 
 if __name__ == '__main__':
 
+    """
     alpha_star = [0.5, 0.5]
     alpha_zero = [0.5, 0.5]
     mu_star = [-0.5, 0.5]
     mu_zero = [-10,1]
     plot_F(alpha_star, alpha_zero, mu_star, mu_zero)
     exit()
+    """
     alpha_star = [0.5, 0.5]
     alpha_zero = [0.5, 0.5]
     mu_star = [-0.5, 0.5]
-    mu_zero = [0.5,1]
-    l_zero = [0,0]
-    r_zero = [0,0]
+    mu_zero = [-1,1]
+    #plot_F(alpha_star, alpha_zero, mu_star, mu_zero)
+    #exit()
+    l_zero = [-0.75,1]
+    r_zero = [0.75,0]
     step_size = 0.1
-    T = 100
-    optimal_discriminator = True
+    T = 10000
+    optimal_discriminator = False
     train_alpha = False
     train(alpha_star, mu_star, alpha_zero, 
           mu_zero, l_zero, r_zero, step_size, 
