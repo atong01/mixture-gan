@@ -58,6 +58,7 @@ def find_zeros(f, mu_star, mu):
     """
     intervals = np.sort(np.array(mu_star + mu)) # Sorted list concatenation
     # For numerical stability widen the range
+    # TODO this doesn't work and we should update it to be adaptive or something smarter.
     intervals[0] -= 1
     intervals[-1] += 1
     fun_interval_sign = np.sign(f(intervals))
@@ -91,7 +92,7 @@ def opt_d_grad(alpha_star, alpha, mu_star, mu):
     r = [None, None]
     mu_all = np.concatenate([mu_star, mu])
     mo = np.argsort(mu_all)
-    f = F(alpha_star, alpha, mu_star, mu)
+    f = F(alpha_star, alpha, mu_star, mu) #  f(x) = G_star - G_t at x
     zeros, types = find_zeros(f, mu_star, mu)
     if len(zeros) == 0:
         plot_F(alpha_star, alpha, mu_star, mu)
@@ -121,6 +122,8 @@ def opt_d_grad(alpha_star, alpha, mu_star, mu):
             l = [zeros[0], zeros[2]]
             r = [zeros[1], np.inf]
     return l, r
+
+
 def mu_grad(alpha, mu, l, r):
     """ Computes the derivatives of mu like C.1 but improved.
     """
@@ -153,12 +156,17 @@ def train(alpha_star, mu_star,
             print('ERROR: Train alpha not yet implemented')
         alpha_hats[t+1] = alpha_hats[t]
 
-        if not optimal_discriminator:
+        if optimal_discriminator:
+            l_hats[t+1], r_hats[t+1] = opt_d_grad(alpha_star, alpha_hats[t+1], mu_star, mu_hats[t])
+            print('(l,r)', l_hats[t+1], r_hats[t+1])
+        else:  # First order dynamics
             print('ERROR: non optimal discriminator not yet implemented')
-        l_hats[t+1], r_hats[t+1] = opt_d_grad(alpha_star, alpha_hats[t+1], mu_star, mu_hats[t])
-        print('(l,r)', l_hats[t+1], r_hats[t+1])
+            
+
         mu_hats[t+1] = mu_hats[t] - step_size * mu_grad(alpha_hats[t+1], mu_hats[t], l_hats[t+1], r_hats[t+1])
         print('Mu Hat', mu_hats[t+1])
+
+
 
         # Assert mu_0 < mu_1
         mu_hats[t+1] = sorted(mu_hats[t+1])
@@ -194,18 +202,29 @@ def plot_training(alpha_star, mu_star, alpha_hats,
 def plot_F(alpha_star, alpha, mu_star, mu):
     """ Plot the TV distance as defined as G* - G_hat"""
     fix, ax = plt.subplots(1,1)
+    for i in (mu_star):
+        plt.axvline(i, color='k')
+    for i in (mu):
+        plt.axvline(i, color='b')
     x = np.linspace(-2, 2, 1000)
     f = F(alpha_star, alpha, mu_star, mu)
     #zeros = find_zeros(f, mu_star, mu)
     #print(zeros)
-    #ax.plot(x, F(alpha_star, [0,0], mu_star, mu)(x), label = 'G_star')
-    #ax.plot(x, F([0,0], alpha, mu_star, mu)(x), label = 'G_hat')
+    ax.plot(x, F(alpha_star, [0,0], mu_star, mu)(x), label = 'G_star')
+    ax.plot(x, F([0,0], alpha, mu_star, mu)(x), label = 'G_hat')
     ax.plot(x, F(alpha_star, alpha, mu_star, mu)(x), label = 'F')
     ax.legend(loc='best')
     plt.show()
 
 
 if __name__ == '__main__':
+
+    alpha_star = [0.5, 0.5]
+    alpha_zero = [0.5, 0.5]
+    mu_star = [-0.5, 0.5]
+    mu_zero = [-10,1]
+    plot_F(alpha_star, alpha_zero, mu_star, mu_zero)
+    exit()
     alpha_star = [0.5, 0.5]
     alpha_zero = [0.5, 0.5]
     mu_star = [-0.5, 0.5]
