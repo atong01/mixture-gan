@@ -7,6 +7,9 @@ from scipy.stats import norm
 import scipy.optimize as optimize
 import numpy as np
 import matplotlib.pyplot as plt
+import random
+#import plotly
+import seaborn as sns
 
 def init_list(init_value, T):
     arr = [None] * T
@@ -217,6 +220,55 @@ def train(alpha_star, mu_star,
     plot_training(alpha_star, mu_star, alpha_hats, mu_hats, l_hats, r_hats, T)
 
 
+def train_with_unrolling(alpha_star, mu_star, 
+          alpha_zero, mu_zero, l_zero, r_zero, 
+          step_size, T, 
+          optimal_discriminator,
+          train_alpha,
+          unrolling_factor
+         ):
+    assert mu_star[0] < mu_star[1]
+    assert mu_zero[0] < mu_zero[1]
+
+    # Initialize Time dependent variables
+    alpha_hats = init_list(alpha_zero, T)
+    mu_hats = init_list(mu_zero, T)
+    l_hats = init_list(l_zero, T)
+    r_hats = init_list(r_zero, T)
+    for t in range(T-1):
+        if train_alpha:
+            print('ERROR: Train alpha not yet implemented')
+        alpha_hats[t+1] = alpha_hats[t]
+
+        if optimal_discriminator:
+            l_hats[t+1], r_hats[t+1] = opt_d_grad(alpha_star, alpha_hats[t+1], mu_star, mu_hats[t])
+            mu_hats[t+1] = mu_hats[t] - step_size * opt_mu_grad(alpha_hats[t+1], mu_hats[t], l_hats[t+1], r_hats[t+1])
+        else:  # First order dynamics
+            l,r = l_hats[t],r_hats[t]
+            for i in range(unrolling_factor):
+                l = l_hats[t] - (step_size * -F(alpha_star, alpha_hats[t], mu_star, mu_hats[t])(l))
+                r = r_hats[t] - (step_size * F(alpha_star, alpha_hats[t], mu_star, mu_hats[t])(r))
+            l_hats[t+1], r_hats[t+1] = l,r
+
+            # The following relies on the non trivial derivation by
+            # wolfram alpha
+            # "derivative with respect to u of integral of e^(-(x - c)^2) - 
+            # e^(-(x-u)^2) with respect to x from a to b"
+            # Thus is the differences of normal pdfs centered at r and those at l
+            # This is a little hacky using the same function but should work
+            mu_hats[t+1] = mu_hats[t] - step_size * loss_gradient_mu(alpha_hats[t], r_hats[t], l_hats[t], mu_hats[t])
+
+        # print('(l,r)', l_hats[t+1], r_hats[t+1])
+        # print('Mu Hat', mu_hats[t+1])
+        # print('l_hats', np.array(l_hats))
+        # print('r_hats', np.array(r_hats))
+
+        # Assert mu_0 < mu_1
+        mu_hats[t+1] = sorted(mu_hats[t+1])
+    #plot_training(alpha_star, mu_star, alpha_hats, mu_hats, l_hats, r_hats, T)
+    return mu_hats[T-1]
+
+
 def plot_training(alpha_star, mu_star, alpha_hats, 
                   mu_hats, l_hats, r_hats, T,
                   plot_intervals = True):
@@ -261,6 +313,56 @@ def plot_F(alpha_star, alpha, mu_star, mu):
     plt.show()
 
 
+def generate_heatmap_grid(alpha_star, mu_star, 
+          alpha_zero, l_zero, r_zero, 
+          step_size, T, 
+          optimal_discriminator,
+          train_alpha,
+          unrolling_factor):
+    """ returns a 2d numpy array cntaning the probabilities of convergence with different mu_0 values"""
+    mu_zero = [0.0,0.0]
+    mu = [-1,-1]            #   top left-most co-ordinate of the grid cell being computed
+    step = 0.2
+    grid_width = 3
+    no_of_rand_points = 3         #   number of initial random points to be used for computing probabilities
+    grid = np.zeros((grid_width,grid_width))
+    for row in range(grid_width):
+        for col in range(row+1):
+            print row,col
+            count = 0
+            for i in range(no_of_rand_points):
+                mu_zero[0] = random.uniform(mu[0],mu[0]+step)
+                mu_zero[1] = random.uniform(mu[1],mu[1]+step)
+                mu_zero[0],mu_zero[1] = min(mu_zero),max(mu_zero)
+                mu_guess = train_with_unrolling(alpha_star, mu_star, alpha_zero, mu_zero, 
+                    l_zero, r_zero, step_size, T, optimal_discriminator, 
+                    train_alpha, unrolling_factor)
+                print mu_guess,mu_star
+                if (mu_guess[0] == mu_star[0] and mu_guess[1] == mu_star[1]):
+                    count += 1
+                grid[row][col] = (count*1.0)/no_of_rand_points
+            mu[1] += step
+        mu[0] += step
+    print grid 
+    return grid
+
+
+def generate_heatmap(alpha_star, mu_star, 
+          alpha_zero, l_zero, r_zero, 
+          step_size, T, 
+          optimal_discriminator,
+          train_alpha,
+          unrolling_factor):
+    grid = generate_heatmap_grid(alpha_star, mu_star, 
+          alpha_zero, l_zero, r_zero, 
+          step_size, T, 
+          optimal_discriminator,
+          train_alpha,
+          unrolling_factor)
+    ax = sns.heatmap(grid, linewidth=0.5)
+    plt.show()
+
+
 if __name__ == '__main__':
 
     """
@@ -283,8 +385,13 @@ if __name__ == '__main__':
     T = 10000
     optimal_discriminator = False
     train_alpha = False
-    train(alpha_star, mu_star, alpha_zero, 
-          mu_zero, l_zero, r_zero, step_size, 
-          T, optimal_discriminator, train_alpha)
+    unrolling_factor = 1
+    generate_heatmap(alpha_star, mu_star, alpha_zero, 
+          l_zero, r_zero, step_size, 
+          T, optimal_discriminator, train_alpha, unrolling_factor)
+
+    #train(alpha_star, mu_star, alpha_zero, 
+    #     mu_zero, l_zero, r_zero, step_size, 
+    #     T, optimal_discriminator, train_alpha)
 
 
