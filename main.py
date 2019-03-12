@@ -8,7 +8,6 @@ import scipy.optimize as optimize
 import numpy as np
 import matplotlib.pyplot as plt
 import random
-#import plotly
 import seaborn as sns
 
 def init_list(init_value, T):
@@ -176,51 +175,8 @@ def opt_mu_grad(alpha, mu, l, r):
     # print('Mu Grad', np.array(mu_grads))
     return np.array(mu_grads)
 
+
 def train(alpha_star, mu_star, 
-          alpha_zero, mu_zero, l_zero, r_zero, 
-          step_size, T, 
-          optimal_discriminator,
-          train_alpha,
-         ):
-    assert mu_star[0] < mu_star[1]
-    assert mu_zero[0] < mu_zero[1]
-
-    # Initialize Time dependent variables
-    alpha_hats = init_list(alpha_zero, T)
-    mu_hats = init_list(mu_zero, T)
-    l_hats = init_list(l_zero, T)
-    r_hats = init_list(r_zero, T)
-    for t in range(T-1):
-        if train_alpha:
-            print('ERROR: Train alpha not yet implemented')
-        alpha_hats[t+1] = alpha_hats[t]
-
-        if optimal_discriminator:
-            l_hats[t+1], r_hats[t+1] = opt_d_grad(alpha_star, alpha_hats[t+1], mu_star, mu_hats[t])
-            mu_hats[t+1] = mu_hats[t] - step_size * mu_grad(alpha_hats[t+1], mu_hats[t], l_hats[t+1], r_hats[t+1])
-        else:  # First order dynamics
-            l_hats[t+1] = l_hats[t] - (step_size * -F(alpha_star, alpha_hats[t], mu_star, mu_hats[t])(l_hats[t]))
-            r_hats[t+1] = r_hats[t] - (step_size * F(alpha_star, alpha_hats[t], mu_star, mu_hats[t])(r_hats[t]))
-
-            # The following relies on the non trivial derivation by
-            # wolfram alpha
-            # "derivative with respect to u of integral of e^(-(x - c)^2) - 
-            # e^(-(x-u)^2) with respect to x from a to b"
-            # Thus is the differences of normal pdfs centered at r and those at l
-            # This is a little hacky using the same function but should work
-            mu_hats[t+1] = mu_hats[t] - step_size * loss_gradient_mu(alpha_hats[t], r_hats[t], l_hats[t], mu_hats[t])
-
-        # print('(l,r)', l_hats[t+1], r_hats[t+1])
-        # print('Mu Hat', mu_hats[t+1])
-        # print('l_hats', np.array(l_hats))
-        # print('r_hats', np.array(r_hats))
-
-        # Assert mu_0 < mu_1
-        mu_hats[t+1] = sorted(mu_hats[t+1])
-    plot_training(alpha_star, mu_star, alpha_hats, mu_hats, l_hats, r_hats, T)
-
-
-def train_with_unrolling(alpha_star, mu_star, 
           alpha_zero, mu_zero, l_zero, r_zero, 
           step_size, T, 
           optimal_discriminator,
@@ -246,8 +202,8 @@ def train_with_unrolling(alpha_star, mu_star,
         else:  # First order dynamics
             l,r = l_hats[t],r_hats[t]
             for i in range(unrolling_factor):
-                l = l_hats[t] - (step_size * -F(alpha_star, alpha_hats[t], mu_star, mu_hats[t])(l))
-                r = r_hats[t] - (step_size * F(alpha_star, alpha_hats[t], mu_star, mu_hats[t])(r))
+                l = l - (step_size * -F(alpha_star, alpha_hats[t], mu_star, mu_hats[t])(l))
+                r = r - (step_size * F(alpha_star, alpha_hats[t], mu_star, mu_hats[t])(r))
             l_hats[t+1], r_hats[t+1] = l,r
 
             # The following relies on the non trivial derivation by
@@ -256,7 +212,8 @@ def train_with_unrolling(alpha_star, mu_star,
             # e^(-(x-u)^2) with respect to x from a to b"
             # Thus is the differences of normal pdfs centered at r and those at l
             # This is a little hacky using the same function but should work
-            mu_hats[t+1] = mu_hats[t] - step_size * loss_gradient_mu(alpha_hats[t], r_hats[t], l_hats[t], mu_hats[t])
+            # We changed this to r[t+1] and l[t+1]... seems better?
+            mu_hats[t+1] = mu_hats[t] - step_size * loss_gradient_mu(alpha_hats[t], r_hats[t+1], l_hats[t+1], mu_hats[t])
 
         # print('(l,r)', l_hats[t+1], r_hats[t+1])
         # print('Mu Hat', mu_hats[t+1])
@@ -265,7 +222,7 @@ def train_with_unrolling(alpha_star, mu_star,
 
         # Assert mu_0 < mu_1
         mu_hats[t+1] = sorted(mu_hats[t+1])
-    #plot_training(alpha_star, mu_star, alpha_hats, mu_hats, l_hats, r_hats, T)
+    # plot_training(alpha_star, mu_star, alpha_hats, mu_hats, l_hats, r_hats, T)
     return mu_hats[T-1]
 
 
@@ -324,26 +281,28 @@ def generate_heatmap_grid(alpha_star, mu_star,
     mu = [-1,-1]            #   top left-most co-ordinate of the grid cell being computed
     step = 0.2
     grid_width = 3
+    tol = 0.2
     no_of_rand_points = 3         #   number of initial random points to be used for computing probabilities
     grid = np.zeros((grid_width,grid_width))
     for row in range(grid_width):
+        mu[1] = -1
         for col in range(row+1):
-            print row,col
+            print (row, col)
             count = 0
             for i in range(no_of_rand_points):
                 mu_zero[0] = random.uniform(mu[0],mu[0]+step)
                 mu_zero[1] = random.uniform(mu[1],mu[1]+step)
                 mu_zero[0],mu_zero[1] = min(mu_zero),max(mu_zero)
-                mu_guess = train_with_unrolling(alpha_star, mu_star, alpha_zero, mu_zero, 
-                    l_zero, r_zero, step_size, T, optimal_discriminator, 
+                mu_guess = train(alpha_star, mu_star, alpha_zero, mu_zero,
+                    l_zero, r_zero, step_size, T, optimal_discriminator,
                     train_alpha, unrolling_factor)
-                print mu_guess,mu_star
-                if (mu_guess[0] == mu_star[0] and mu_guess[1] == mu_star[1]):
+                print (mu_guess, mu_star)
+                if (mu_guess[0] - mu_star[0] < tol and mu_guess[1] - mu_star[1] < tol):
                     count += 1
-                grid[row][col] = (count*1.0)/no_of_rand_points
+            grid[row][col] = (count*1.0)/no_of_rand_points
             mu[1] += step
         mu[0] += step
-    print grid 
+    print(grid)
     return grid
 
 
@@ -382,8 +341,8 @@ if __name__ == '__main__':
     l_zero = [-0.75,1]
     r_zero = [0.75,0]
     step_size = 0.1
-    T = 10000
-    optimal_discriminator = False
+    T = 1000
+    optimal_discriminator = True
     train_alpha = False
     unrolling_factor = 1
     generate_heatmap(alpha_star, mu_star, alpha_zero, 
