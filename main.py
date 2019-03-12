@@ -7,6 +7,7 @@ from scipy.stats import norm
 import scipy.optimize as optimize
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib
 import random
 import seaborn as sns
 import joblib
@@ -67,6 +68,8 @@ def find_zeros(f, mu_star, mu):
     This currently assumes that the three zeros lie with at most within each mean.
 
     """
+    mu_star = list(mu_star)
+    mu = list(mu)
     intervals = np.sort(np.array(mu_star + mu)) # Sorted list concatenation
     # For numerical stability widen the range
     # TODO this doesn't work and we should update it to be adaptive or something smarter.
@@ -187,8 +190,8 @@ def train(alpha_star, mu_star,
           train_alpha,
           unrolling_factor
          ):
-    assert mu_star[0] < mu_star[1]
-    assert mu_zero[0] < mu_zero[1]
+    assert mu_star[0] <= mu_star[1]
+    assert mu_zero[0] <= mu_zero[1]
 
     # Initialize Time dependent variables
     alpha_hats = init_list(alpha_zero, T)
@@ -282,30 +285,27 @@ def build_heatmap_params_grid(alpha_star, mu_star,
           unrolling_factor):
     """ returns a 2d numpy array cntaning the probabilities of convergence with different mu_0 values"""
     mu_zero = [0.0,0.0]
-    mu = [-1,-1]            #   top left-most co-ordinate of the grid cell being computed
-    step = 0.2
     grid_width = 10
-    no_of_rand_points = 10         #   number of initial random points to be used for computing probabilities
-    grid = np.zeros((grid_width,grid_width))
+    no_of_rand_points = 20         #   number of initial random points to be used for computing probabilities
+    coords = np.linspace(-1, 1, grid_width)
+    print(coords)
     # Parameters for a given run
     runs = []
     for row in range(grid_width):
-        mu[1] = -1
         for col in range(row+1):
-            print (row, col)
-            count = 0
             for i in range(no_of_rand_points):
+                intervals = np.sort(np.random.uniform(-3, 3, size=4))
+                l_zero = [intervals[0], intervals[2]]
+                r_zero = [intervals[1], intervals[3]]
                 # alpha_star, mu_star
-                mu_zero[0] = random.uniform(mu[0],mu[0]+step)
-                mu_zero[1] = random.uniform(mu[1],mu[1]+step)
-                mu_zero[0],mu_zero[1] = min(mu_zero),max(mu_zero)
-                params = [alpha_star, mu_star, alpha_zero, mu_zero,
-                             l_zero, r_zero, step_size, T, optimal_discriminator,
+                #mu_zero[0] = random.uniform(mu[0],mu[0]+step)
+                #mu_zero[1] = random.uniform(mu[1],mu[1]+step)
+                mu_zero = np.sort([coords[row], coords[col]])
+                params = [alpha_star, mu_star, alpha_zero, mu_zero.copy(),
+                             l_zero.copy(), r_zero.copy(), step_size, T, optimal_discriminator,
                              train_alpha, unrolling_factor]
-                meta = mu.copy()
+                meta = mu_zero.copy()
                 runs.append((meta, params))
-            mu[1] += step
-        mu[0] += step
     print('running %d runs' % len(runs))
     #pprint(runs)
     return runs
@@ -352,15 +352,15 @@ def generate_heatmap(alpha_star, mu_star,
           train_alpha,
           unrolling_factor)
     mu_ts = npdo(lambda: run_params_parallel(runs), 'output.npy')
-    meta = np.array(list(zip(*runs))[0])
+    meta = np.array(list(zip(*runs))[0])[:,::-1]
     tol = 0.1
-    converged = np.all((mu_ts - mu_star) < tol, axis=1).astype(np.float)
+    converged = np.all(np.abs(mu_ts - mu_star) < tol, axis=1).astype(np.float)
 
     meta_df = pd.DataFrame(meta, columns = ['mu_0', 'mu_1'])
     output = pd.DataFrame(converged, columns = ['Converged'])
     df = pd.concat([meta_df, output], axis=1)
     df_agg = df.groupby(['mu_0', 'mu_1'], as_index=False).agg('mean')
-    sns.heatmap(df_agg.pivot('mu_0', 'mu_1', 'Converged'))
+    sns.heatmap(df_agg.pivot('mu_0', 'mu_1', 'Converged'), vmin=0, vmax=1, cmap='jet')
     plt.show()
 
 
@@ -374,17 +374,19 @@ if __name__ == '__main__':
     plot_F(alpha_star, alpha_zero, mu_star, mu_zero)
     exit()
     """
-    alpha_star = [0.5, 0.5]
-    alpha_zero = [0.5, 0.5]
+    alpha_star = [0.9, 0.1]
+    alpha_zero = [0.9, 0.1]
+    #alpha_star = [0.5, 0.5]
+    #alpha_zero = [0.5, 0.5]
     mu_star = [-0.5, 0.5]
     mu_zero = [-1,1]
     #plot_F(alpha_star, alpha_zero, mu_star, mu_zero)
     #exit()
     l_zero = [-0.75,1]
     r_zero = [0.75,0]
-    step_size = 0.1
-    T = 1000
-    optimal_discriminator = True
+    step_size = 0.3
+    T = 3000
+    optimal_discriminator = False
     train_alpha = False
     unrolling_factor = 1
     generate_heatmap(alpha_star, mu_star, alpha_zero, 
