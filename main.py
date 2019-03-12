@@ -9,6 +9,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import random
 import seaborn as sns
+import joblib
+import pandas as pd
+import time
+from pprint import pprint
 
 def init_list(init_value, T):
     arr = [None] * T
@@ -270,7 +274,7 @@ def plot_F(alpha_star, alpha, mu_star, mu):
     plt.show()
 
 
-def generate_heatmap_grid(alpha_star, mu_star, 
+def build_heatmap_params_grid(alpha_star, mu_star, 
           alpha_zero, l_zero, r_zero, 
           step_size, T, 
           optimal_discriminator,
@@ -280,19 +284,36 @@ def generate_heatmap_grid(alpha_star, mu_star,
     mu_zero = [0.0,0.0]
     mu = [-1,-1]            #   top left-most co-ordinate of the grid cell being computed
     step = 0.2
-    grid_width = 3
-    tol = 0.2
-    no_of_rand_points = 3         #   number of initial random points to be used for computing probabilities
+    grid_width = 10
+    no_of_rand_points = 10         #   number of initial random points to be used for computing probabilities
     grid = np.zeros((grid_width,grid_width))
+    # Parameters for a given run
+    runs = []
     for row in range(grid_width):
         mu[1] = -1
         for col in range(row+1):
             print (row, col)
             count = 0
             for i in range(no_of_rand_points):
+                # alpha_star, mu_star
                 mu_zero[0] = random.uniform(mu[0],mu[0]+step)
                 mu_zero[1] = random.uniform(mu[1],mu[1]+step)
                 mu_zero[0],mu_zero[1] = min(mu_zero),max(mu_zero)
+                params = [alpha_star, mu_star, alpha_zero, mu_zero,
+                             l_zero, r_zero, step_size, T, optimal_discriminator,
+                             train_alpha, unrolling_factor]
+                meta = mu.copy()
+                runs.append((meta, params))
+            mu[1] += step
+        mu[0] += step
+    print('running %d runs' % len(runs))
+    #pprint(runs)
+    return runs
+
+def run_params_parallel(runs):
+    return np.array(joblib.Parallel(n_jobs=-1, verbose=10)(joblib.delayed(train)(*params) for _,params in runs))
+
+"""
                 mu_guess = train(alpha_star, mu_star, alpha_zero, mu_zero,
                     l_zero, r_zero, step_size, T, optimal_discriminator,
                     train_alpha, unrolling_factor)
@@ -300,10 +321,22 @@ def generate_heatmap_grid(alpha_star, mu_star,
                 if (mu_guess[0] - mu_star[0] < tol and mu_guess[1] - mu_star[1] < tol):
                     count += 1
             grid[row][col] = (count*1.0)/no_of_rand_points
-            mu[1] += step
-        mu[0] += step
-    print(grid)
-    return grid
+"""
+
+def npdo(f, path, verbose = True):
+    assert path.endswith('.npy')
+    try:
+        tmp = np.load(path)
+        if verbose: print('Successfully loaded from file')
+        return tmp
+    except FileNotFoundError as inst:
+        print('File not found, running given function and storing')
+        start = time.time()
+        out = f()
+        end = time.time()
+        print('Took: %d seconds.' % (end - start))
+        np.save(path, out)
+        return out
 
 
 def generate_heatmap(alpha_star, mu_star, 
@@ -312,13 +345,22 @@ def generate_heatmap(alpha_star, mu_star,
           optimal_discriminator,
           train_alpha,
           unrolling_factor):
-    grid = generate_heatmap_grid(alpha_star, mu_star, 
+    runs = build_heatmap_params_grid(alpha_star, mu_star, 
           alpha_zero, l_zero, r_zero, 
           step_size, T, 
           optimal_discriminator,
           train_alpha,
           unrolling_factor)
-    ax = sns.heatmap(grid, linewidth=0.5)
+    mu_ts = npdo(lambda: run_params_parallel(runs), 'output.npy')
+    meta = np.array(list(zip(*runs))[0])
+    tol = 0.1
+    converged = np.all((mu_ts - mu_star) < tol, axis=1).astype(np.float)
+
+    meta_df = pd.DataFrame(meta, columns = ['mu_0', 'mu_1'])
+    output = pd.DataFrame(converged, columns = ['Converged'])
+    df = pd.concat([meta_df, output], axis=1)
+    df_agg = df.groupby(['mu_0', 'mu_1'], as_index=False).agg('mean')
+    sns.heatmap(df_agg.pivot('mu_0', 'mu_1', 'Converged'))
     plt.show()
 
 
