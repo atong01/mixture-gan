@@ -15,6 +15,7 @@ import pandas as pd
 import time
 from pprint import pprint
 
+
 def init_list(init_value, T):
     arr = [None] * T
     arr[0] = init_value
@@ -23,17 +24,17 @@ def init_list(init_value, T):
 
 def discriminator_expectation(alpha, mu, l, r):
     discriminator_exp = 0
-    for a,m in zip(alpha,mu):
+    for a, m in zip(alpha, mu):
         for rr in r:
-            discriminator_exp+= a * norm.cdf(rr, m)
+            discriminator_exp += a * norm.cdf(rr, m)
         for ll in l:
-            discriminator_exp-= a * norm.cdf(ll, m)
+            discriminator_exp -= a * norm.cdf(ll, m)
     return discriminator_exp
 
 
 def loss(alpha_star, alpha, mu_star, mu, l, r):
     """ Calculate loss function value
-    L(mu, l, r) = E_{x~G*} [D(x)] + E_{x~G} [1 - D(x)] 
+    L(mu, l, r) = E_{x~G*} [D(x)] + E_{x~G} [1 - D(x)]
                             ^real            ^fake
     """
     d_real = discriminator_expectation(alpha, mu_star, l, r)
@@ -50,9 +51,9 @@ def F(alpha_star, alpha, mu_star, mu):
     vectors of length 2.
     """
     def f(x):
-        return (alpha_star[0] * norm.pdf(x, mu_star[0]) + 
-                alpha_star[1] * norm.pdf(x, mu_star[1]) - 
-                alpha[0] * norm.pdf(x, mu[0]) - 
+        return (alpha_star[0] * norm.pdf(x, mu_star[0]) +
+                alpha_star[1] * norm.pdf(x, mu_star[1]) -
+                alpha[0] * norm.pdf(x, mu[0]) -
                 alpha[1] * norm.pdf(x, mu[1]))
     return f
 
@@ -65,18 +66,20 @@ def find_zeros(f, mu_star, mu):
     Returns zeros in sorted order
 
     TODO: Check that these intervals are actually the right ones to check. I.e.
-    This currently assumes that the three zeros lie with at most within each mean.
-
+    This currently assumes that the three zeros lie with at most within each
+    mean.
     """
     mu_star = list(mu_star)
     mu = list(mu)
-    intervals = np.sort(np.array(mu_star + mu)) # Sorted list concatenation
+    intervals = np.sort(np.array(mu_star + mu))     # Sorted list concatenation
     # For numerical stability widen the range
-    # TODO this doesn't work and we should update it to be adaptive or something smarter.
+    # TODO this doesn't work and we should update it to be adaptive
+    # or something smarter.
     intervals[0] -= 1
     intervals[-1] += 1
     fun_interval_sign = np.sign(f(intervals))
-    diffs = np.sign(np.diff(fun_interval_sign))  # Zero if same sign, +/-2 if different
+    # Zero if same sign, +/-2 if different
+    diffs = np.sign(np.diff(fun_interval_sign))
     zeros = []
     types = []
     for i, diff in enumerate(diffs):
@@ -85,8 +88,8 @@ def find_zeros(f, mu_star, mu):
         root = optimize.brentq(f, intervals[i], intervals[i+1])
         zeros.append(root)
         types.append('L' if diff > 0 else 'R')
-    if len(zeros) == 0: # This should be impossible.
-        print('No Zeros??? Something went terribly wrong... Printing helpful debug info')
+    if len(zeros) == 0:  # This should be impossible.
+        print('No Zeros??? Something went terribly wrong... Printing debug')
         print('intervals', intervals)
         print('f(intervals)', f(intervals))
         print('mus', mu_star, mu)
@@ -96,7 +99,6 @@ def find_zeros(f, mu_star, mu):
 
 def opt_d_grad(alpha_star, alpha, mu_star, mu):
     """ Calculate argmax_{l,r} Loss
-    
     TODO (alex): Assumes alpha_star = alpha = 0.5
     Maximizing G_star - G_t, thus intervals where G* > G^t
 
@@ -153,7 +155,9 @@ def loss_gradient_mu(alpha, left, right, mu):
 
 
 def loss_gradient_left(left):
-    """ gradient of the loss function with respect to the left side boundaries"""
+    """ gradient of the loss function with respect to the left
+    side boundaries
+    """
     def grad(alpha_star, alpha, mu_star, mu):
         return -F(alpha_star, alpha, mu_star, mu)(left)
 
@@ -176,7 +180,7 @@ def opt_mu_grad(alpha, mu, l, r):
     for m in mu:
         v = 0
         s = 1 / np.sqrt(2 * np.pi) 
-        for ll, rr in zip(l,r):
+        for ll, rr in zip(l, r):
             v += norm.pdf(m, rr) - norm.pdf(m, ll)
         mu_grads.append(s*v)
     # print('Mu Grad', np.array(mu_grads))
@@ -188,8 +192,7 @@ def train(alpha_star, mu_star,
           step_size, T, 
           optimal_discriminator,
           train_alpha,
-          unrolling_factor
-         ):
+          unrolling_factor):
     assert mu_star[0] <= mu_star[1]
     assert mu_zero[0] <= mu_zero[1]
 
@@ -311,7 +314,7 @@ def build_heatmap_params_grid(alpha_star, mu_star,
     return runs
 
 def run_params_parallel(runs):
-    return np.array(joblib.Parallel(n_jobs=-1, verbose=10)(joblib.delayed(train)(*params) for _,params in runs))
+    return np.array(joblib.Parallel(n_jobs=36, verbose=10)(joblib.delayed(train)(*params) for _,params in runs))
 
 """
                 mu_guess = train(alpha_star, mu_star, alpha_zero, mu_zero,
@@ -339,12 +342,7 @@ def npdo(f, path, verbose = True):
         return out
 
 
-def generate_heatmap(alpha_star, mu_star, 
-          alpha_zero, l_zero, r_zero, 
-          step_size, T, 
-          optimal_discriminator,
-          train_alpha,
-          unrolling_factor):
+def generate_heatmap(runs):
     runs = build_heatmap_params_grid(alpha_star, mu_star, 
           alpha_zero, l_zero, r_zero, 
           step_size, T, 
@@ -359,8 +357,12 @@ def generate_heatmap(alpha_star, mu_star,
     meta_df = pd.DataFrame(meta, columns = ['mu_0', 'mu_1'])
     output = pd.DataFrame(converged, columns = ['Converged'])
     df = pd.concat([meta_df, output], axis=1)
+    print(df)
     df_agg = df.groupby(['mu_0', 'mu_1'], as_index=False).agg('mean')
-    sns.heatmap(df_agg.pivot('mu_0', 'mu_1', 'Converged'), vmin=0, vmax=1, cmap='jet')
+    sns.heatmap(df_agg.pivot('mu_0', 'mu_1', 'Converged'), 
+                vmin=0, 
+                # vmax=1, 
+                cmap='jet')
     plt.show()
 
 
@@ -374,8 +376,8 @@ if __name__ == '__main__':
     plot_F(alpha_star, alpha_zero, mu_star, mu_zero)
     exit()
     """
-    alpha_star = [0.9, 0.1]
-    alpha_zero = [0.9, 0.1]
+    alpha_star = [0.5, 0.5]
+    alpha_zero = [0.5, 0.5]
     #alpha_star = [0.5, 0.5]
     #alpha_zero = [0.5, 0.5]
     mu_star = [-0.5, 0.5]
