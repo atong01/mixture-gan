@@ -366,6 +366,101 @@ def generate_heatmap(runs):
     plt.show()
 
 
+
+
+def train_with_early_stop(alpha_star, mu_star, 
+          alpha_zero, mu_zero, l_zero, r_zero, 
+          step_size, T,                                     #   T - max number of interations
+          optimal_discriminator,
+          train_alpha,
+          unrolling_factor,
+          delta                                     
+         ):
+    assert mu_star[0] < mu_star[1]
+    assert mu_zero[0] < mu_zero[1]
+
+    # Initialize Time dependent variables
+    alpha_hats = init_list(alpha_zero, T)
+    mu_hats = init_list(mu_zero, T)
+    l_hats = init_list(l_zero, T)
+    r_hats = init_list(r_zero, T)
+    t = 0           #   number of iterations for algorithm to stop
+    print t, np.linalg.norm(mu_star-mu_hats[t]), delta
+    while(t < T-1 and np.linalg.norm(np.array(mu_star)-np.array(mu_hats[t])) > delta ):
+        if train_alpha:
+            print('ERROR: Train alpha not yet implemented')
+        alpha_hats[t+1] = alpha_hats[t]
+
+        if optimal_discriminator:
+            l_hats[t+1], r_hats[t+1] = opt_d_grad(alpha_star, alpha_hats[t+1], mu_star, mu_hats[t])
+            mu_hats[t+1] = mu_hats[t] - step_size * opt_mu_grad(alpha_hats[t+1], mu_hats[t], l_hats[t+1], r_hats[t+1])
+        else:  # First order dynamics
+            l,r = l_hats[t],r_hats[t]
+            for i in range(unrolling_factor):
+                l = l - (step_size * -F(alpha_star, alpha_hats[t], mu_star, mu_hats[t])(l))
+                r = r - (step_size * F(alpha_star, alpha_hats[t], mu_star, mu_hats[t])(r))
+            l_hats[t+1], r_hats[t+1] = l,r
+            mu_hats[t+1] = mu_hats[t] - step_size * loss_gradient_mu(alpha_hats[t], r_hats[t+1], l_hats[t+1], mu_hats[t])
+
+        # print('(l,r)', l_hats[t+1], r_hats[t+1])
+        # print('Mu Hat', mu_hats[t+1])
+        # print('l_hats', np.array(l_hats))
+        # print('r_hats', np.array(r_hats))
+
+        # Assert mu_0 < mu_1
+        mu_hats[t+1] = sorted(mu_hats[t+1])
+        t += 1
+    
+    return t
+
+
+def plot_rate_of_convergence_fixed_alpha(alpha_star, mu_star, 
+          l_zero, r_zero, 
+          step_size,                                    
+          optimal_discriminator,
+          train_alpha,
+          unrolling_factor,
+          T,
+          delta  ):
+    
+    no_of_points = 20          #    number of random initial points to pick for computing avg convergence time
+    no_of_alpha = 10                     
+    alpha = np.linspace(0.0, 1.0, no_of_alpha)
+
+    convergence_time = np.zeros(no_of_alpha)
+    convergence_prob = np.zeros(no_of_alpha)            #   fraction of points converging for each alpha
+    mu_zero = np.zeros(2)
+    for i in range(no_of_points):
+        mu_zero[0] = random.uniform(-3,3)
+        mu_zero[1] = random.uniform(-3,3) 
+        mu_zero[0],mu_zero[1] = min(mu_zero),max(mu_zero)  
+        for j in range(no_of_alpha):
+            alpha_star[0],alpha_star[1] = alpha[j],1-alpha[j]
+            alpha_zero = alpha_star
+            t = train_with_early_stop(alpha_star, mu_star, alpha_zero, mu_zero, l_zero, r_zero, 
+          step_size, T, optimal_discriminator, train_alpha, unrolling_factor, delta)
+            if (t < T-1):          #   convergence occurs
+                convergence_time[j] += t
+                convergence_prob[j] += 1
+
+    for j in range(no_of_alpha):
+        if convergence_prob[j] > 0:
+            convergence_time[j] = (1.0*convergence_time[j])/convergence_prob[j]
+    convergence_prob = (1.0*convergence_prob)/no_of_points
+    convergence_time /= (T-1)
+    plt.plot(alpha,convergence_time)
+    plt.plot(alpha,convergence_prob)
+    plt.xlabel("alpha parameter")
+    plt.legend(['convergence rate','convergence probability'])
+    #plt.axis([0, 1, 0, 1])
+    plt.title("Convergence rate as a function of alpha for first order dynamics")
+    plt.show()
+
+
+
+
+
+
 if __name__ == '__main__':
 
     """
@@ -387,13 +482,19 @@ if __name__ == '__main__':
     l_zero = [-0.75,1]
     r_zero = [0.75,0]
     step_size = 0.3
-    T = 3000
+    T = 1000
     optimal_discriminator = False
     train_alpha = False
     unrolling_factor = 1
-    generate_heatmap(alpha_star, mu_star, alpha_zero, 
-          l_zero, r_zero, step_size, 
-          T, optimal_discriminator, train_alpha, unrolling_factor)
+    delta = 0.1                #   tolerance
+    plot_rate_of_convergence_fixed_alpha(alpha_star, mu_star, 
+          l_zero, r_zero, step_size,                                    
+          optimal_discriminator, train_alpha,
+          unrolling_factor, T, delta )
+
+    #generate_heatmap(alpha_star, mu_star, alpha_zero, 
+    #      l_zero, r_zero, step_size, 
+    #      T, optimal_discriminator, train_alpha, unrolling_factor)
 
     #train(alpha_star, mu_star, alpha_zero, 
     #     mu_zero, l_zero, r_zero, step_size, 
