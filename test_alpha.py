@@ -2,16 +2,18 @@
 Test the effect of varying but fixed alpha_star on the convergence rate
 """
 
+from pprint import pprint
 import pandas as pd
 import numpy as np
-from pprint import pprint
 import joblib
 
 import main
 
 
 def test_alpha_params():
-    """ returns a 2d numpy array cntaning the probabilities of convergence with different mu_0 values"""
+    """ returns a 2d numpy array cntaning the probabilities of convergence with
+    different mu_0 values
+    """
     grid_width = 10
     coords = np.linspace(-1, 1, grid_width)
     # Parameters for a given run
@@ -70,4 +72,5 @@ def run_parallel(runs):
 if __name__ == '__main__':
     runs = test_alpha_params()
     df = run_parallel(runs)
-    df.to_pickle('output.pkl')
+    out = pd.concat([runs, df], axis=1)
+    out.to_pickle('data/alpha_exploration.pkl')
