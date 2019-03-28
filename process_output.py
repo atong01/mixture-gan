@@ -20,7 +20,8 @@ def generate_heatmap(fname):
     converged = np.all(np.abs(mu_ts - mu_star) < tol, axis=1).astype(np.float)
     output = pd.DataFrame(converged, columns=['Converged'])
     df = pd.concat([dataframe, output], axis=1)
-    for optimal_discriminator in [False, True]:
+    for optimal_discriminator in [True]:
+    #for optimal_discriminator in [False, True]:
         for alpha in sorted(df['alpha_star_1'].unique()):
             mask = np.bitwise_and(df.alpha_star_1 == alpha,
                                   df.optimal_discriminator == optimal_discriminator)
@@ -34,10 +35,11 @@ def generate_heatmap(fname):
             title = 'alpha_%0.3f_opt_%s.png' % (alpha, optimal_discriminator)
             plt.title(title)
             plt.tight_layout()
-            plt.savefig('images/alpha/%s' % title)
+            plt.savefig('images/alpha_od/%s' % title)
             plt.close()
 
 
 if __name__ == '__main__':
-    FNAME = 'data/alpha_exploration.pkl'
+    FNAME = 'data/optimal_discriminator_alpha_exploration.pkl'
+    #FNAME = 'data/alpha_exploration.pkl'
     generate_heatmap(FNAME)
