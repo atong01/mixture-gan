@@ -155,21 +155,13 @@ def loss_gradient_mu(alpha, left, right, mu):
     return grads
 
 
-def loss_gradient_left(left):
-    """ gradient of the loss function with respect to the left
-    side boundaries
-    """
-    def grad(alpha_star, alpha, mu_star, mu):
-        return -F(alpha_star, alpha, mu_star, mu)(left)
-
-
-def loss_gradient_right(right):
-    """ gradient of the loss function with respect to the right side
-    boundaries. Renaming of F
-    """
-    def grad(alpha_star, alpha, mu_star, mu):
-        return F(alpha_star, alpha, mu_star, mu)(right)
-
+def loss_gradient_alpha(alpha, mu, l, r):
+    """ gradient of the loss function with respect to alpha """
+    grads = np.zeros(2)
+    for j in [0,1]:
+        for i in [0,1]:
+            grads[j] += norm.cdf(r[i], mu[j]) - norm.cdf(l[i], mu[j])
+    return grads
 
 def opt_mu_grad(alpha, mu, l, r):
     """ Computes the derivatives of mu like C.1 but improved. Only works in
@@ -202,10 +194,15 @@ def train(alpha_star, mu_star,
     mu_hats = init_list(mu_zero, T)
     l_hats = init_list(l_zero, T)
     r_hats = init_list(r_zero, T)
+    # TODO What is the best order to update these parameters?
+    # Right now we have (1) alpha, (2) l,r, (3) mu
     for t in range(T-1):
         if train_alpha:
-            print('ERROR: Train alpha not yet implemented')
-        alpha_hats[t+1] = alpha_hats[t]
+            # print('ERROR: Train alpha not yet implemented')
+            agrad = loss_gradient_alpha(alpha_hats[t], mu_hats[t], l_hats[t], r_hats[t])
+            alpha_hats[t+1] = alpha_hats[t] - step_size * agrad 
+        else:
+            alpha_hats[t+1] = alpha_hats[t]
 
         if optimal_discriminator:
             l_hats[t+1], r_hats[t+1] = opt_d_grad(alpha_star, alpha_hats[t+1], mu_star, mu_hats[t])
@@ -233,7 +230,7 @@ def train(alpha_star, mu_star,
 
         # Assert mu_0 < mu_1
         mu_hats[t+1] = sorted(mu_hats[t+1])
-    # plot_training(alpha_star, mu_star, alpha_hats, mu_hats, l_hats, r_hats, T)
+    plot_training(alpha_star, mu_star, alpha_hats, mu_hats, l_hats, r_hats, T)
     return mu_hats[T-1]
 
 
@@ -247,15 +244,17 @@ def plot_training(alpha_star, mu_star, alpha_hats,
     mu_hats = np.array(mu_hats)
     l_hats = np.array(l_hats)
     r_hats = np.array(r_hats)
+    alpha_hats = np.array(alpha_hats)
     x = np.arange(T)
-    ax.plot(x, mu_hats[:,0], 'r', label = 'muhat0')
-    ax.plot(x, mu_hats[:,1], 'g', label = 'muhat1')
+    ax.plot(x, mu_hats[:,0], 'r', label='muhat0')
+    ax.plot(x, mu_hats[:,1], 'g', label='muhat1')
+    ax.plot(x, alpha_hats[:,0], 'k', label='alpha0')
     if plot_intervals:
-        ax.plot(x, l_hats[:,0], '--', label = 'left0')
-        ax.plot(x, l_hats[:,1], '--', label = 'left1')
+        ax.plot(x, l_hats[:,0], '--', label='left0')
+        ax.plot(x, l_hats[:,1], '--', label='left1')
 
-        ax.plot(x, r_hats[:,0], '--', label = 'right0')
-        ax.plot(x, r_hats[:,1], '--', label = 'right1')
+        ax.plot(x, r_hats[:,0], '--', label='right0')
+        ax.plot(x, r_hats[:,1], '--', label='right1')
     ax.legend()
     ax.set_ylim((-3,3))
     plt.show()
@@ -470,23 +469,23 @@ if __name__ == '__main__':
     #exit()
     l_zero = [-0.75,1]
     r_zero = [0.75,0]
-    step_size = 0.3
-    T = 1000
+    step_size = 0.1
+    T = 3000
     optimal_discriminator = False
-    train_alpha = False
+    train_alpha = True
     unrolling_factor = 1
     delta = 0.1                #   tolerance
-    plot_rate_of_convergence_fixed_alpha(alpha_star, mu_star, 
-          l_zero, r_zero, step_size,                                    
-          optimal_discriminator, train_alpha,
-          unrolling_factor, T, delta )
+    # plot_rate_of_convergence_fixed_alpha(alpha_star, mu_star, 
+    #       l_zero, r_zero, step_size,                                    
+    #       optimal_discriminator, train_alpha,
+    #       unrolling_factor, T, delta )
 
     #generate_heatmap(alpha_star, mu_star, alpha_zero, 
     #      l_zero, r_zero, step_size, 
     #      T, optimal_discriminator, train_alpha, unrolling_factor)
 
-    #train(alpha_star, mu_star, alpha_zero, 
-    #     mu_zero, l_zero, r_zero, step_size, 
-    #     T, optimal_discriminator, train_alpha)
+    train(alpha_star, mu_star, alpha_zero, 
+         mu_zero, l_zero, r_zero, step_size, 
+         T, optimal_discriminator, train_alpha, unrolling_factor)
 
 
