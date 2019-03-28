@@ -71,12 +71,14 @@ def find_zeros(f, mu_star, mu):
     """
     mu_star = list(mu_star)
     mu = list(mu)
-    intervals = np.sort(np.array(mu_star + mu))     # Sorted list concatenation
-    # For numerical stability widen the range
-    # TODO this doesn't work and we should update it to be adaptive
-    # or something smarter.
-    intervals[0] -= 1
-    intervals[-1] += 1
+    intervals = sorted(list(mu_star) + list(mu))  # Sorted list concatenation
+    # For numerical stability add two more points
+    # TODO this doesn't work in all cases and we should update it
+    # to be adaptive or something smarter.
+    intervals.append(intervals[-1] + 1)
+    intervals.append(intervals[0] - 1)
+    intervals = np.sort(np.array(intervals))
+
     fun_interval_sign = np.sign(f(intervals))
     # Zero if same sign, +/-2 if different
     diffs = np.sign(np.diff(fun_interval_sign))
@@ -94,6 +96,8 @@ def find_zeros(f, mu_star, mu):
         print('f(intervals)', f(intervals))
         print('mus', mu_star, mu)
         print('fun_interval_sign', fun_interval_sign)
+    if len(zeros) > 3:  # This should be impossible.
+        print('%d Zeros??? Oh No...' % len(zeros))
     return zeros, types
 
 
@@ -385,7 +389,7 @@ def train_with_early_stop(alpha_star, mu_star,
     l_hats = init_list(l_zero, T)
     r_hats = init_list(r_zero, T)
     t = 0           #   number of iterations for algorithm to stop
-    print t, np.linalg.norm(mu_star-mu_hats[t]), delta
+    print (t, np.linalg.norm(mu_star-mu_hats[t]), delta)
     while(t < T-1 and np.linalg.norm(np.array(mu_star)-np.array(mu_hats[t])) > delta ):
         if train_alpha:
             print('ERROR: Train alpha not yet implemented')
