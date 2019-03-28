@@ -110,8 +110,6 @@ def opt_d_grad(alpha_star, alpha, mu_star, mu):
     """
     l = [None, None]
     r = [None, None]
-    mu_all = np.concatenate([mu_star, mu])
-    mo = np.argsort(mu_all)
     f = F(alpha_star, alpha, mu_star, mu) #  f(x) = G_star - G_t at x
     zeros, types = find_zeros(f, mu_star, mu)
     if len(zeros) == 0:
@@ -147,14 +145,13 @@ def opt_d_grad(alpha_star, alpha, mu_star, mu):
 def loss_gradient_mu(alpha, left, right, mu):
     """ gradient of the loss function with respect to mu"""
     grads = np.zeros(2)
-    for j,m in enumerate(mu):
+    for j, m in enumerate(mu):
         grad = 0
-        for l,r in zip(left, right):
+        for l, r in zip(left, right):
             # print('pdf', l, r, norm.pdf(m, r), norm.pdf(m,l))
             grad += norm.pdf(m, r) - norm.pdf(m, l)
         grads[j] = grad
     grads *= alpha
-    # print('Mu Gradient', grads)
     return grads
 
 
@@ -175,7 +172,7 @@ def loss_gradient_right(right):
 
 
 def opt_mu_grad(alpha, mu, l, r):
-    """ Computes the derivatives of mu like C.1 but improved. Only works in 
+    """ Computes the derivatives of mu like C.1 but improved. Only works in
     the optimal discriminator case. This is a simplification of
     loss_gradient_mu function, which applies for general l, r discriminator
     bounds.
@@ -191,9 +188,9 @@ def opt_mu_grad(alpha, mu, l, r):
     return np.array(mu_grads)
 
 
-def train(alpha_star, mu_star, 
-          alpha_zero, mu_zero, l_zero, r_zero, 
-          step_size, T, 
+def train(alpha_star, mu_star,
+          alpha_zero, mu_zero, l_zero, r_zero,
+          step_size, T,
           optimal_discriminator,
           train_alpha,
           unrolling_factor):
@@ -251,8 +248,6 @@ def plot_training(alpha_star, mu_star, alpha_hats,
     l_hats = np.array(l_hats)
     r_hats = np.array(r_hats)
     x = np.arange(T)
-    #ax.plot(x, np.repeat(mu_star[0], T), '-')
-    #ax.plot(x, np.repeat(mu_star[1], T), '-')
     ax.plot(x, mu_hats[:,0], 'r', label = 'muhat0')
     ax.plot(x, mu_hats[:,1], 'g', label = 'muhat1')
     if plot_intervals:
@@ -274,9 +269,9 @@ def plot_F(alpha_star, alpha, mu_star, mu):
     for i in (mu):
         plt.axvline(i, color='b')
     x = np.linspace(-2, 2, 1000)
-    f = F(alpha_star, alpha, mu_star, mu)
-    #zeros = find_zeros(f, mu_star, mu)
-    #print(zeros)
+    # f = F(alpha_star, alpha, mu_star, mu)
+    # zeros = find_zeros(f, mu_star, mu)
+    # print(zeros)
     ax.plot(x, F(alpha_star, [0,0], mu_star, mu)(x), label = 'G_star')
     ax.plot(x, F([0,0], alpha, mu_star, mu)(x), label = 'G_hat')
     ax.plot(x, F(alpha_star, alpha, mu_star, mu)(x), label = 'F')
@@ -305,8 +300,8 @@ def build_heatmap_params_grid(alpha_star, mu_star,
                 l_zero = [intervals[0], intervals[2]]
                 r_zero = [intervals[1], intervals[3]]
                 # alpha_star, mu_star
-                #mu_zero[0] = random.uniform(mu[0],mu[0]+step)
-                #mu_zero[1] = random.uniform(mu[1],mu[1]+step)
+                # mu_zero[0] = random.uniform(mu[0],mu[0]+step)
+                # mu_zero[1] = random.uniform(mu[1],mu[1]+step)
                 mu_zero = np.sort([coords[row], coords[col]])
                 params = [alpha_star, mu_star, alpha_zero, mu_zero.copy(),
                              l_zero.copy(), r_zero.copy(), step_size, T, optimal_discriminator,
@@ -314,21 +309,11 @@ def build_heatmap_params_grid(alpha_star, mu_star,
                 meta = mu_zero.copy()
                 runs.append((meta, params))
     print('running %d runs' % len(runs))
-    #pprint(runs)
     return runs
 
 def run_params_parallel(runs):
     return np.array(joblib.Parallel(n_jobs=36, verbose=10)(joblib.delayed(train)(*params) for _,params in runs))
 
-"""
-                mu_guess = train(alpha_star, mu_star, alpha_zero, mu_zero,
-                    l_zero, r_zero, step_size, T, optimal_discriminator,
-                    train_alpha, unrolling_factor)
-                print (mu_guess, mu_star)
-                if (mu_guess[0] - mu_star[0] < tol and mu_guess[1] - mu_star[1] < tol):
-                    count += 1
-            grid[row][col] = (count*1.0)/no_of_rand_points
-"""
 
 def npdo(f, path, verbose = True):
     assert path.endswith('.npy')
