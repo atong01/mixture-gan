@@ -75,8 +75,8 @@ def find_zeros(f, mu_star, mu):
     # For numerical stability add two more points
     # TODO this doesn't work in all cases and we should update it
     # to be adaptive or something smarter.
-    intervals.append(intervals[-1] + 1)
-    intervals.append(intervals[0] - 1)
+    intervals.append(intervals[-1] + 10)
+    intervals.append(intervals[0] - 10)
     intervals = np.sort(np.array(intervals))
 
     fun_interval_sign = np.sign(f(intervals))
@@ -177,7 +177,7 @@ def opt_mu_grad(alpha, mu, l, r):
             v += norm.pdf(m, rr) - norm.pdf(m, ll)
         mu_grads.append(s*v)
     # print('Mu Grad', np.array(mu_grads))
-    return np.array(mu_grads)
+    return np.array(mu_grads) * alpha
 
 
 def train(alpha_star, mu_star,
@@ -229,8 +229,8 @@ def train(alpha_star, mu_star,
         # print('r_hats', np.array(r_hats))
 
         # Assert mu_0 < mu_1
-        mu_hats[t+1] = sorted(mu_hats[t+1])
-    plot_training(alpha_star, mu_star, alpha_hats, mu_hats, l_hats, r_hats, T)
+        # mu_hats[t+1] = sorted(mu_hats[t+1])
+    plot_training(alpha_star, mu_star, alpha_hats, mu_hats, l_hats, r_hats, T, plot_intervals=False)
     return mu_hats[T-1]
 
 
@@ -268,11 +268,11 @@ def plot_F(alpha_star, alpha, mu_star, mu):
     for i in (mu):
         plt.axvline(i, color='b')
     x = np.linspace(-2, 2, 1000)
-    # f = F(alpha_star, alpha, mu_star, mu)
-    # zeros = find_zeros(f, mu_star, mu)
-    # print(zeros)
-    ax.plot(x, F(alpha_star, [0,0], mu_star, mu)(x), label = 'G_star')
-    ax.plot(x, F([0,0], alpha, mu_star, mu)(x), label = 'G_hat')
+    f = F(alpha_star, alpha, mu_star, mu)
+    zeros = find_zeros(f, mu_star, mu)
+    print(zeros)
+    #ax.plot(x, F(alpha_star, [0,0], mu_star, mu)(x), label = 'G_star')
+    #ax.plot(x, F([0,0], alpha, mu_star, mu)(x), label = 'G_hat')
     ax.plot(x, F(alpha_star, alpha, mu_star, mu)(x), label = 'F')
     ax.legend(loc='best')
     plt.show()
@@ -396,7 +396,7 @@ def train_with_early_stop(alpha_star, mu_star,
         # print('r_hats', np.array(r_hats))
 
         # Assert mu_0 < mu_1
-        mu_hats[t+1] = sorted(mu_hats[t+1])
+        # mu_hats[t+1] = sorted(mu_hats[t+1])
         t += 1
     
     return t
@@ -444,35 +444,32 @@ def plot_rate_of_convergence_fixed_alpha(alpha_star, mu_star,
     plt.title("Convergence rate as a function of alpha for first order dynamics")
     plt.show()
 
-
-
-
-
-
 if __name__ == '__main__':
 
     """
-    alpha_star = [0.5, 0.5]
-    alpha_zero = [0.5, 0.5]
-    mu_star = [-0.5, 0.5]
-    mu_zero = [-10,1]
+    alpha_star = [0.1, 0.9]
+    alpha_zero = [0.1, 0.9]
+    mu_star = [0, 0.5]
+    mu_zero = [0.9,0.4]
     plot_F(alpha_star, alpha_zero, mu_star, mu_zero)
     exit()
     """
-    alpha_star = [0.5, 0.5]
-    alpha_zero = [0.5, 0.5]
+    alpha_star = [0.1, 0.9]
+    alpha_zero = [0.1, 0.9]
     #alpha_star = [0.5, 0.5]
     #alpha_zero = [0.5, 0.5]
-    mu_star = [-0.5, 0.5]
-    mu_zero = [-1,1]
+    mu_star = [0.0, 0.5]
+    #mu_star = [0.45, 0.5]
+    mu_zero = [2, 2.2]
+    #mu_zero = [1,1.1]
     #plot_F(alpha_star, alpha_zero, mu_star, mu_zero)
     #exit()
     l_zero = [-0.75,1]
     r_zero = [0.75,0]
-    step_size = 0.1
-    T = 3000
-    optimal_discriminator = False
-    train_alpha = True
+    step_size = 0.2
+    T = 10000
+    optimal_discriminator = True
+    train_alpha = False
     unrolling_factor = 1
     delta = 0.1                #   tolerance
     # plot_rate_of_convergence_fixed_alpha(alpha_star, mu_star, 
@@ -484,8 +481,8 @@ if __name__ == '__main__':
     #      l_zero, r_zero, step_size, 
     #      T, optimal_discriminator, train_alpha, unrolling_factor)
 
-    train(alpha_star, mu_star, alpha_zero, 
+    print(train(alpha_star, mu_star, alpha_zero, 
          mu_zero, l_zero, r_zero, step_size, 
-         T, optimal_discriminator, train_alpha, unrolling_factor)
+         T, optimal_discriminator, train_alpha, unrolling_factor))
 
 
