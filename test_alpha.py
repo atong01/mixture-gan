@@ -19,8 +19,8 @@ def test_alpha_learning():
     coords = np.linspace(-1, 1, grid_width)
     # Parameters for a given run
     runs = []
-    no_of_rand_points = 100
-    for alpha in np.geomspace(0.01, 0.5, 15):
+    no_of_rand_points = 10
+    for alpha in np.geomspace(0.01, 0.5, 5):
         for row in range(grid_width):
             for col in range(row+1):
                 for i in range(no_of_rand_points):
@@ -59,8 +59,9 @@ def test_alpha_params():
     runs = []
     for optimal_discriminator in [True]:
     #for optimal_discriminator in [False, True]:
-        no_of_rand_points = 2 if optimal_discriminator else 100
-        for alpha in np.geomspace(0.01, 0.5, 15):
+        no_of_rand_points = 1 if optimal_discriminator else 100
+        for alpha in [0.01, 0.1, 0.25, 0.5]:
+        #for alpha in np.geomspace(0.01, 0.5, 10):
             for row in range(grid_width):
                 for col in range(row+1):
                     for i in range(no_of_rand_points):
@@ -110,9 +111,9 @@ def run_parallel(runs):
 
 
 if __name__ == '__main__':
-    # runs = test_alpha_params()
-    runs = test_alpha_learning()
+    runs = test_alpha_params()
+    # runs = test_alpha_learning()
     df = run_parallel(runs)
     out = pd.concat([runs, df], axis=1)
-    out.to_pickle('data/learned_alpha_exploration.pkl')
+    out.to_pickle('data/optimal_alpha_true.pkl')
 

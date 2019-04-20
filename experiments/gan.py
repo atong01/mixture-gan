@@ -96,7 +96,7 @@ class GAN():
         train_data = np.random.multivariate_normal([0, 0],
                                                    [[1, 0], [0, 3]],
                                                    size=(2**16))
-        self.plot_data(train_data)
+        #self.plot_data(train_data)
 
         # Adversarial ground truths
         true_gt = np.ones((batch_size, 1))
@@ -123,7 +123,7 @@ class GAN():
 
             if batch_idx % sample_interval == 0:
                 self.show_samples(batch_idx)
-                self.plot_discriminator(batch_idx)
+                #self.plot_discriminator(batch_idx)
                 self.save(batch_idx)
 
     def plot_data(self, d):
@@ -137,6 +137,8 @@ class GAN():
         noise = np.random.normal(size=(1000, self.latent_dim))
         samples = self.generator.predict(noise)
         plt.scatter(samples[:, 0], samples[:, 1], c='k')
+        plt.xlim(-10, 10)
+        plt.ylim(-10, 10)
         plt.savefig(self.model_dir + '/generator_%d.png' % batch_idx)
         plt.close()
 
@@ -160,10 +162,13 @@ class GAN():
         plt.savefig(self.model_dir + '/discriminator_%d.png' % batch_idx)
         plt.close()
 
-    def save(self, batch_idx):
+    def save(self, batch_idx=None):
         print('Saving model to: %s' % self.model_dir)
-        util.save(self.generator, self.model_dir + '/generator_model_%d' % batch_idx)
-        util.save(self.discriminator, self.model_dir + '/discriminator_model_%d' % batch_idx)
+        suffix = 'model'
+        if batch_idx is not None:
+            suffix = 'model_%d' % batch_idx
+        util.save(self.generator, self.model_dir + '/generator_%s' % suffix)
+        util.save(self.discriminator, self.model_dir + '/discriminator_%s' % suffix)
 
 
 class RandomWeightedAverage(Average):
@@ -245,10 +250,10 @@ class WGANGP(GAN):
         fake_gt = np.ones((batch_size, 1))
         dummy_gt = np.zeros((batch_size, 1))
 
-        for batch_idx in range(num_batches):
+        for batch_idx in range(num_batches+1):
             for _ in range(self.n_critic):
-                idx = np.random.randint(0, train_data.shape[0], batch_size)
-                real = train_data[idx]
+                idx = np.random.randint(0, data.shape[0], batch_size)
+                real = data[idx]
                 noise = np.random.normal(size=(batch_size, self.latent_dim))
                 d_loss = self.discriminator_model.train_on_batch([real, noise],
                                                                  [true_gt, fake_gt, dummy_gt])
@@ -262,8 +267,8 @@ class WGANGP(GAN):
                   (batch_idx, d_loss[0], g_loss))
 
             if batch_idx % sample_interval == 0:
-                self.show_samples(batch_idx)
-                self.plot_discriminator(batch_idx)
+                #self.show_samples(batch_idx)
+                #self.plot_discriminator(batch_idx)
                 self.save(batch_idx)
 
     def build_discriminator(self):
@@ -283,20 +288,27 @@ class WGANGP(GAN):
         return Model(sample, score)
 
 
-if __name__ == '__main__':
+import click
+@click.command()
+@click.argument('path', type=click.Path())
+@click.argument('mixture', type=float)
+@click.argument('seed', type=int)
+@click.argument('std', type=float)
+def train(path, mixture, seed, std):
     util.set_config()
-    model = WGANGP('wgan4/')
-    np.random.seed(42)
-    mixture = 0.5
+    model = WGANGP('%s/mix_%0.2f/%d' % (path, mixture, seed))
+    np.random.seed(seed)
     train_data = np.random.multivariate_normal([2, 0],
-                                               [[0.25, 0], [0, 0.25]],
+                                               [[std, 0], [0, std]],
                                                size=int((2**10) * mixture))
     train_data2 = np.random.multivariate_normal([-2, 0],
-                                                [[0.25, 0], [0, 0.25]],
+                                                [[std, 0], [0, std]],
                                                 size=int((2**10)* (1 - mixture)))
     train_data = np.concatenate([train_data, train_data2])
     np.random.shuffle(train_data)
-    model.plot_data(train_data)
+    #model.plot_data(train_data)
+    model.train(train_data, 10000, sample_interval=200)
+    model.save()
 
-    # model = GAN('gan2/')
-    model.train(train_data, 30000)
+if __name__ == '__main__':
+    train()

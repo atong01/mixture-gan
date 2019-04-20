@@ -230,7 +230,7 @@ def train(alpha_star, mu_star,
 
         # Assert mu_0 < mu_1
         # mu_hats[t+1] = sorted(mu_hats[t+1])
-    plot_training(alpha_star, mu_star, alpha_hats, mu_hats, l_hats, r_hats, T, plot_intervals=False)
+#    plot_training(alpha_star, mu_star, alpha_hats, mu_hats, l_hats, r_hats, T, plot_intervals=False)
     return mu_hats[T-1]
 
 

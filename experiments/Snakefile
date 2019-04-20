@@ -1,0 +1,39 @@
+import os
+import pandas as pd
+import subprocess
+
+EMAIL = "alexanderytong@gmail.com"
+
+def get_files(wildcards):
+    runs = pd.read_csv('runs.csv')
+    return list(runs.path)
+
+def get_score_files(wildcards):
+    runs = pd.read_csv('runs.csv')
+    paths = [os.path.join(os.path.split(path)[0], 'scores.npy') for path in runs.path]
+    return paths
+
+def get_plot_files(wildcards):
+    directory = '/home/alex/mixture-gan/experiments/auto3'
+    stdout, _ = subprocess.Popen(['find', directory, '-name', 'generator_model*.json'], 
+                                 stdout=subprocess.PIPE).communicate()
+    models = [s.decode('utf-8')[:-5] for s in stdout.split()]
+    models = [('%s.png' % s) for s in models if s.endswith('0')]
+    return models
+
+rule:
+    # input: "/home/alex/data/anomaly/mnist/all_scores.npy"
+    # input: "/data/atong/anomaly/mnist/all_scores.npy"
+    # input: get_files
+    input: get_plot_files
+
+rule train:
+    output: "{prefix}/mix_{mixture}/{seed}/generator_model.json"
+    shell: "python gan.py {wildcards.prefix} {wildcards.mixture} {wildcards.seed} 0.03125"
+    #shell: "python gan.py {wildcards.prefix} {wildcards.mixture} {wildcards.seed} 0.125"
+    #shell: "python gan.py {wildcards.prefix} {wildcards.mixture} {wildcards.seed} 0.25"
+
+rule plot:
+    input: "{prefix}/generator_{batch_idx}.json"
+    output: "{prefix}/generator_{batch_idx}.png"
+    shell: "CUDA_VISIBLE_DEVICES='' python plot.py {input}"

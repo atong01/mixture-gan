@@ -35,11 +35,12 @@ def generate_heatmap(fname):
             title = 'alpha_%0.3f_opt_%s.png' % (alpha, optimal_discriminator)
             plt.title(title)
             plt.tight_layout()
-            plt.savefig('images/alpha_od/%s' % title)
+            plt.savefig('images/true/%s' % title)
             plt.close()
 
 
 if __name__ == '__main__':
     FNAME = 'data/optimal_discriminator_alpha_exploration.pkl'
+    FNAME = 'data/optimal_alpha_true.pkl'
     #FNAME = 'data/alpha_exploration.pkl'
     generate_heatmap(FNAME)
